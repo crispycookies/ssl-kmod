@@ -159,12 +159,33 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 			data_to_be_copied = ioread32(ds->addr);
 			ptr = (u8*)(&data_to_be_copied);
 
+			if((*offp+count)>sizeof(u32))
+				count = sizeof(u32)-(*offp);
+
+			if((*offp) < 0){
+				pr_err("Invalid Offest");
+				return -EINVAL;
+			}
+			if((*offp) >= sizeof(u32)){
+				pr_err("Invalid Offest");
+				return -EINVAL;
+			}
+			if(count == 0){
+				pr_err("Invalid Count");
+				return -EINVAL;
+			}
+			if(count >= sizeof(u32)){
+				pr_err("Invalid Count");
+				return -EINVAL;
+			}
+
 // TODO Over
-			bytes_not_copied = copy_to_user(mem, ptr, sizeof(data_to_be_copied));
+			bytes_not_copied = copy_to_user(mem, ptr+*offp, count);
 			if(bytes_not_copied!=0){
-				pr_err("Failed to copy all 4 Bytes");
+				pr_err("Failed to copy all Bytes");
 				return bytes_not_copied;
 			}
+			*offp += count;
       return 0;
 }
 static ssize_t dev_write(struct file *filep, const char __user *mem,
