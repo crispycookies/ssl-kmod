@@ -146,9 +146,6 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 			struct driver_struct * ds;
 			u32 data_to_be_copied;
 			unsigned long bytes_not_copied;
-			u8 * ptr;
-
-
 // TODO ?
 // ALt 1
 			ds = container_of(filep->private_data, struct driver_struct, miscdev);
@@ -157,7 +154,10 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 				return -EINVAL;
 			}
 			data_to_be_copied = ioread32(ds->addr);
-			ptr = (u8*)(&data_to_be_copied);
+
+			printk(KERN_ERR "Data Read is: %d", data_to_be_copied);
+
+
 
 			if((*offp+count)>sizeof(u32))
 				count = sizeof(u32)-(*offp);
@@ -166,27 +166,28 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 				pr_err("Invalid Offest");
 				return -EINVAL;
 			}
-			if((*offp) >= sizeof(u32)){
+			if((*offp) > sizeof(u32)){
+				printk(KERN_ERR "%lld", *offp);
 				pr_err("Invalid Offest");
 				return -EINVAL;
 			}
 			if(count == 0){
-				pr_err("Invalid Count");
-				return -EINVAL;
+				return count;
 			}
-			if(count >= sizeof(u32)){
+			if(count > sizeof(u32)){
+				printk(KERN_ERR "%d", count);
 				pr_err("Invalid Count");
 				return -EINVAL;
 			}
 
 // TODO Over
-			bytes_not_copied = copy_to_user(mem, ptr+*offp, count);
+			bytes_not_copied = copy_to_user(mem, &data_to_be_copied+(*offp), count);
 			if(bytes_not_copied!=0){
 				pr_err("Failed to copy all Bytes");
 				return bytes_not_copied;
 			}
-			*offp += count;
-      return 0;
+			*offp += (count-bytes_not_copied);
+      return count;
 }
 static ssize_t dev_write(struct file *filep, const char __user *mem,
 					size_t count, loff_t *offp){
