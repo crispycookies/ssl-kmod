@@ -1,4 +1,4 @@
-/*HDC Device Kernel Module
+/*SSG Device Kernel Module
  *for registering and storing button presses
  *and making them available to user
  *Copyright (C) 2019  Tobias Egger <s1910567016@students.fh-hagenberg.at>
@@ -28,28 +28,38 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 
-// Erste 16 Bit, Temp
-// Zweite 16 Bit, Humid
+#define SIZE 9
+#define DPY_CNT 6
+#define ENA_OFFSET 8
+#define DPY_OFFSET 0
+#define PWM_OFFSET 4
 
 struct driver_struct{
 	void * addr;
+	u8 buffer[SIZE];
 	struct miscdevice miscdev;
 };
 
-#define DEVICE_NAME "hcsensor"
-#define DEVICE_COMP_STR "sch,hc-sensor-1.0"
+#define DEVICE_NAME "sevensegmentdisplay"
+#define DEVICE_COMP_STR "hof,sevensegment-1.0"
 
 static ssize_t dev_write(struct file *filep, const char __user *mem,
 					size_t count, loff_t *offp);
 static ssize_t dev_read(struct file *filep, char __user *mem,
           size_t count, loff_t *offp);
 
+static int dev_open(struct inode *inode, struct file *filep);
+static int dev_release(struct inode *inode, struct file *filep);
+
 static int dev_probe(struct platform_device *pdev);
 static int dev_remove(struct platform_device *pdev);
 
 struct file_operations fops = {
+	 .owner = THIS_MODULE,
+	 .open = dev_open,
    .read = dev_read,
    .write = dev_write,
+	 .release = dev_release,
 };
 //TODO
 //static struct miscdevice miscdev;
@@ -143,30 +153,72 @@ module_platform_driver(driver_platform_driver);
 
 static ssize_t dev_read(struct file *filep, char __user *mem,
 					size_t count, loff_t *offp){
+
+						struct driver_struct * ds;
+						unsigned long bytes_not_copied;
+			// TODO ?
+			// ALt 1
+						ds = container_of(filep->private_data, struct driver_struct, miscdev);
+						if(ds == NULL){
+							pr_err("Failed to get Container Info");
+							return -EINVAL;
+						}
+
+
+						if((*offp+count)>SIZE)
+							count = SIZE-(*offp);
+
+						if((*offp) < 0){
+							pr_err("Invalid Offest");
+							return -EINVAL;
+						}
+						if((*offp) > SIZE){
+							printk(KERN_ERR "%lld", *offp);
+							pr_err("Invalid Offest");
+							return -EINVAL;
+						}
+						if(count == 0){
+							return count;
+						}
+						if(count > SIZE){
+							printk(KERN_ERR "%d", count);
+							pr_err("Invalid Count");
+							return -EINVAL;
+						}
+
+			// TODO Over
+						bytes_not_copied = copy_to_user(mem, ds->buffer+(*offp), count);
+						if(bytes_not_copied!=0){
+							pr_err("Failed to copy all Bytes");
+							return bytes_not_copied;
+						}
+						*offp += (count-bytes_not_copied);
+			      return count;
+}
+static ssize_t dev_write(struct file *filep, const char __user *mem,
+					size_t count, loff_t *offp){
 			struct driver_struct * ds;
-			u32 data_to_be_copied;
-			unsigned long bytes_not_copied;
-// TODO ?
-// ALt 1
+			int i;
+			u32 ena = 0;
+			u32 data = 0;
+			u32 pwm = 0;
+
 			ds = container_of(filep->private_data, struct driver_struct, miscdev);
+			pr_info("Addr: Start -> %08lx",
+				(long unsigned int)ds->addr);
+
 			if(ds == NULL){
 				pr_err("Failed to get Container Info");
 				return -EINVAL;
 			}
-			data_to_be_copied = ioread32(ds->addr);
 
-			printk(KERN_ERR "Data Read is: %d", data_to_be_copied);
-
-
-
-			if((*offp+count)>sizeof(u32))
-				count = sizeof(u32)-(*offp);
-
+			if((*offp+count)>SIZE)
+				count = SIZE-(*offp);
 			if((*offp) < 0){
 				pr_err("Invalid Offest");
 				return -EINVAL;
 			}
-			if((*offp) > sizeof(u32)){
+			if((*offp) > SIZE){
 				printk(KERN_ERR "%lld", *offp);
 				pr_err("Invalid Offest");
 				return -EINVAL;
@@ -174,28 +226,57 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 			if(count == 0){
 				return count;
 			}
-			if(count > sizeof(u32)){
+			if(count > SIZE){
 				printk(KERN_ERR "%d", count);
 				pr_err("Invalid Count");
 				return -EINVAL;
 			}
 
-// TODO Over
+			count = count - copy_from_user(ds->buffer + (*offp), mem, count);
 
-			bytes_not_copied = copy_to_user(mem, &data_to_be_copied+(*offp), count);
-			if(bytes_not_copied!=0){
-				pr_err("Failed to copy all Bytes");
-				return bytes_not_copied;
+			printk(KERN_INFO "Value Read : i -> 1: val - >  0x%02hhx", ds->buffer[0]);
+			printk(KERN_INFO "Value Read : i -> 2: val - >  0x%02hhx", ds->buffer[1]);
+			printk(KERN_INFO "Value Read : i -> 3: val - >  0x%02hhx", ds->buffer[2]);
+			printk(KERN_INFO "Value Read : i -> 4: val - >  0x%02hhx", ds->buffer[3]);
+
+			printk(KERN_INFO "Value Read : i -> 5: val - >  0x%02hhx", ds->buffer[4]);
+			printk(KERN_INFO "Value Read : i -> 6: val - >  0x%02hhx", ds->buffer[5]);
+			printk(KERN_INFO "Value Read : i -> 7: val - >  0x%02hhx", ds->buffer[6]);
+			printk(KERN_INFO "Value Read : i -> 8: val - >  0x%02hhx", ds->buffer[7]);
+
+			printk(KERN_INFO "Value Read : i -> 8: val - >  0x%02hhx", ds->buffer[8]);
+
+			printk(KERN_INFO "%lld", (*offp));
+
+			printk(KERN_INFO "------\n");
+
+			ena |= ds->buffer[1];
+			iowrite32(ena, ds->addr+ENA_OFFSET);
+
+			for(i = 2; i < DPY_CNT+2; i++){
+				data = data << 4;
+				data |= ds->buffer[i];
 			}
-			*offp += (count-bytes_not_copied);
-      return count;
+
+			iowrite32(data, ds->addr+DPY_OFFSET);
+			pr_info("Addr: Start -> %08lx",(long unsigned int)data);
+
+			pwm |= ds->buffer[8];
+			iowrite32(pwm, ds->addr+PWM_OFFSET);
+			pr_info("Addr: Start -> %08lx",(long unsigned int)pwm);
+
+			return count;
 }
-static ssize_t dev_write(struct file *filep, const char __user *mem,
-					size_t count, loff_t *offp){
-      pr_info("Memory is Read Only");
-      return 0;
+static int dev_open(struct inode *inode, struct file *filep){
+
+		return 0;
 }
+static int dev_release(struct inode *inode, struct file *filep){
+
+		return 0;
+}
+
 
 MODULE_AUTHOR("Tobias Egger <s1910567016@students.fh-hagenberg.at>");
-MODULE_DESCRIPTION("Kernel Module to control the HDC via Character Device");
+MODULE_DESCRIPTION("Kernel Module to control the Display via Character Device");
 MODULE_LICENSE("GPL v2");
