@@ -44,12 +44,17 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 static ssize_t dev_read(struct file *filep, char __user *mem,
           size_t count, loff_t *offp);
 
+static int dev_open(struct inode *inode, struct file *filep);
+static int dev_release(struct inode *inode, struct file *filep);
+
 static int dev_probe(struct platform_device *pdev);
 static int dev_remove(struct platform_device *pdev);
 
 struct file_operations fops = {
+	 .open = dev_open,
    .read = dev_read,
    .write = dev_write,
+	 .release = dev_release,
 };
 //TODO
 //static struct miscdevice miscdev;
@@ -194,6 +199,15 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 					size_t count, loff_t *offp){
       pr_info("Memory is Read Only");
       return 0;
+}
+
+static int dev_open(struct inode *inode, struct file *filep){
+
+		return 0;
+}
+static int dev_release(struct inode *inode, struct file *filep){
+
+		return 0;
 }
 
 MODULE_AUTHOR("Tobias Egger <s1910567016@students.fh-hagenberg.at>");
