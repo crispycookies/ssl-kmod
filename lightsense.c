@@ -1,4 +1,4 @@
-/*HDC Device Kernel Module
+/*Lightsense Device Kernel Module
  *for registering and storing button presses
  *and making them available to user
  *Copyright (C) 2019  Tobias Egger <s1910567016@students.fh-hagenberg.at>
@@ -28,16 +28,14 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 
-// Erste 16 Bit, Temp
-// Zweite 16 Bit, Humid
 
 struct driver_struct{
 	void * addr;
 	struct miscdevice miscdev;
 };
 
-#define DEVICE_NAME "hcsensor"
-#define DEVICE_COMP_STR "sch,hc-sensor-1.0"
+#define DEVICE_NAME "light-sense"
+#define DEVICE_COMP_STR "sch,lightsense-1.0"
 
 static ssize_t dev_write(struct file *filep, const char __user *mem,
 					size_t count, loff_t *offp);
@@ -185,8 +183,6 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 				return -EINVAL;
 			}
 
-// TODO Over
-
 			bytes_not_copied = copy_to_user(mem, &data_to_be_copied+(*offp), count);
 			if(bytes_not_copied!=0){
 				pr_err("Failed to copy all Bytes");
@@ -211,5 +207,5 @@ static int dev_release(struct inode *inode, struct file *filep){
 }
 
 MODULE_AUTHOR("Tobias Egger <s1910567016@students.fh-hagenberg.at>");
-MODULE_DESCRIPTION("Kernel Module to control the HDC via Character Device");
+MODULE_DESCRIPTION("Kernel Module to control the Lightsensor via Character Device");
 MODULE_LICENSE("GPL v2");
