@@ -28,7 +28,7 @@
 #include <linux/module.h>
 #include <linux/platform_device.h>
 
-#define SIZE 9
+#define SIZE 8
 #define DPY_CNT 6
 #define ENA_OFFSET 8
 #define DPY_OFFSET 0
@@ -244,16 +244,14 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 			printk(KERN_INFO "Value Read : i -> 7: val - >  0x%02hhx", ds->buffer[6]);
 			printk(KERN_INFO "Value Read : i -> 8: val - >  0x%02hhx", ds->buffer[7]);
 
-			printk(KERN_INFO "Value Read : i -> 8: val - >  0x%02hhx", ds->buffer[8]);
-
 			printk(KERN_INFO "%lld", (*offp));
 
 			printk(KERN_INFO "------\n");
 
-			ena |= ds->buffer[1];
+			ena |= ds->buffer[0];
 			iowrite32(ena, ds->addr+ENA_OFFSET);
 
-			for(i = 2; i < DPY_CNT+2; i++){
+			for(i = 1; i < DPY_CNT+1; i++){
 				data = data << 4;
 				data |= ds->buffer[i];
 			}
@@ -261,7 +259,7 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 			iowrite32(data, ds->addr+DPY_OFFSET);
 			pr_info("Addr: Start -> %08lx",(long unsigned int)data);
 
-			pwm |= ds->buffer[8];
+			pwm |= ds->buffer[7];
 			iowrite32(pwm, ds->addr+PWM_OFFSET);
 			pr_info("Addr: Start -> %08lx",(long unsigned int)pwm);
 
