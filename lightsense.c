@@ -146,50 +146,47 @@ module_platform_driver(driver_platform_driver);
 
 static ssize_t dev_read(struct file *filep, char __user *mem,
 					size_t count, loff_t *offp){
-			struct driver_struct * ds;
-			u32 data_to_be_copied;
-			unsigned long bytes_not_copied;
-// TODO ?
-// ALt 1
-			ds = container_of(filep->private_data, struct driver_struct, miscdev);
-			if(ds == NULL){
-				pr_err("Failed to get Container Info");
-				return -EINVAL;
-			}
-			data_to_be_copied = ioread32(ds->addr);
+		struct driver_struct * ds;
+		u32 data_to_be_copied;
+		unsigned long bytes_not_copied;
 
-			printk(KERN_ERR "Data Read is: %d", data_to_be_copied);
+		ds = container_of(filep->private_data, struct driver_struct, miscdev);
+		if(ds == NULL){
+			pr_err("Failed to get Container Info");
+			return -EINVAL;
+		}
 
+		data_to_be_copied = ioread32(ds->addr);
+		printk(KERN_ERR "Data Read is: %d", data_to_be_copied);
 
 
-			if((*offp+count)>sizeof(u32))
-				count = sizeof(u32)-(*offp);
 
-			if((*offp) < 0){
-				pr_err("Invalid Offest");
-				return -EINVAL;
-			}
-			if((*offp) > sizeof(u32)){
-				printk(KERN_ERR "%lld", *offp);
-				pr_err("Invalid Offest");
-				return -EINVAL;
-			}
-			if(count == 0){
-				return count;
-			}
-			if(count > sizeof(u32)){
-				printk(KERN_ERR "%d", count);
-				pr_err("Invalid Count");
-				return -EINVAL;
-			}
-
-			bytes_not_copied = copy_to_user(mem, &data_to_be_copied+(*offp), count);
-			if(bytes_not_copied!=0){
-				pr_err("Failed to copy all Bytes");
-				return bytes_not_copied;
-			}
-			*offp += (count-bytes_not_copied);
-      return count;
+		if((*offp+count)>sizeof(u32))
+			count = sizeof(u32)-(*offp);
+		if((*offp) < 0){
+			pr_err("Invalid Offest");
+			return -EINVAL;
+		}
+		if((*offp) > sizeof(u32)){
+			printk(KERN_ERR "%lld", *offp);
+			pr_err("Invalid Offest");
+			return -EINVAL;
+		}
+		if(count == 0){
+			return count;
+		}
+		if(count > sizeof(u32)){
+			printk(KERN_ERR "%d", count);
+			pr_err("Invalid Count");
+			return -EINVAL;
+		}
+		bytes_not_copied = copy_to_user(mem, &data_to_be_copied+(*offp), count);
+		if(bytes_not_copied!=0){
+			pr_err("Failed to copy all Bytes");
+			return bytes_not_copied;
+		}
+		*offp += (count-bytes_not_copied);
+    return count;
 }
 static ssize_t dev_write(struct file *filep, const char __user *mem,
 					size_t count, loff_t *offp){
