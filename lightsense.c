@@ -34,7 +34,7 @@ struct driver_struct{
 	struct miscdevice miscdev;
 };
 
-#define DEVICE_NAME "light-sense"
+#define DEVICE_NAME "apdsensor"
 #define DEVICE_COMP_STR "sch,apd9301-1.0"
 
 static ssize_t dev_write(struct file *filep, const char __user *mem,
