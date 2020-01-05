@@ -204,13 +204,15 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 			u32 pwm = 0;
 
 			ds = container_of(filep->private_data, struct driver_struct, miscdev);
-			pr_info("Addr: Start -> %08lx",
-				(long unsigned int)ds->addr);
-
 			if(ds == NULL){
 				pr_err("Failed to get Container Info");
 				return -EINVAL;
 			}
+	
+			pr_info("Addr: Start -> %08lx",
+				(long unsigned int)ds->addr);
+
+			
 
 			if((*offp+count)>SIZE)
 				count = SIZE-(*offp);
