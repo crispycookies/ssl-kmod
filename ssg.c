@@ -142,13 +142,13 @@ static int dev_remove(struct platform_device *pdev){
 }
 
 static struct platform_driver driver_platform_driver = {
-		.probe = dev_probe,
-		.remove = dev_remove,
-		.driver = {
-			.name = DEVICE_NAME,
-			.owner = THIS_MODULE,
-			.of_match_table = of_match_ptr(driver_match_table),
-        },
+	.probe = dev_probe,
+	.remove = dev_remove,
+	.driver = {
+		.name = DEVICE_NAME,
+		.owner = THIS_MODULE,
+		.of_match_table = of_match_ptr(driver_match_table),
+	},
 };
 module_platform_driver(driver_platform_driver);
 
