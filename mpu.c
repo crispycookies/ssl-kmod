@@ -1,5 +1,5 @@
 /*MPU Device Kernel Module
- *for registering and storing button presses
+ *for registering and storinggyro data
  *and making them available to user
  *Copyright (C) 2019  Tobias Egger <s1910567016@students.fh-hagenberg.at>
  *This program is free software; you can redistribute it and/or
