@@ -37,6 +37,8 @@
 #define THR_OFFSET_REGISTER 0x14
 #define CFG_OFFSET_REGISTER 0x10
 #define TGL_BITMASK 0x2
+#define RES_2_LEN 3072
+#define TOTAL_RES_LEN R_LEN/2+RES_2_LEN/2
 
 struct driver_struct{
 	void * addr;
@@ -182,6 +184,7 @@ static ssize_t dev_read(struct file *filep, char __user *mem,CFG_REG_SIZE
 	unsigned long bytes_not_copied;
 	u32 i = 0;
 	u32 buffer = 0;
+	u32 resetvalue = 0;
 
 	ds = container_of(filep->private_data, struct driver_struct, miscdev);
 	if(ds == NULL){
@@ -195,14 +198,21 @@ static ssize_t dev_read(struct file *filep, char __user *mem,CFG_REG_SIZE
 		data_to_be_copied[i] = (u16)buffer;
 		printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", data_to_be_copied[i], buffer);
 	}
+	//3072 Vlaues
+	for(i = 0; i < RES_2_LEN/4; i++){
+		// Only Debug
+		buffer = ioread32(ds->addr+i*4);
+		data_to_be_copied[i+R_LEN/4] = (u16)buffer;
+		printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", data_to_be_copied[i+R_LEN/4], buffer);
+	}
 
-	if((*offp+count)>R_LEN/2)
-		count = R_LEN/2-(*offp);
+	if((*offp+count)>TOTAL_RES_LEN)
+		count = TOTAL_RES_LEN-(*offp);
 	if((*offp) < 0){
 		pr_err("Invalid Offest");
 		return -EINVAL;
 	}
-	if((*offp) > R_LEN/2){
+	if((*offp) > TOTAL_RES_LEN){
 		printk(KERN_ERR "%lld", *offp);
 		pr_err("Invalid Offest");
 		return -EINVAL;
@@ -210,7 +220,7 @@ static ssize_t dev_read(struct file *filep, char __user *mem,CFG_REG_SIZE
 	if(count == 0){
 		return count;
 	}
-	if(count > R_LEN/2){
+	if(count > TOTAL_RES_LEN){
 		printk(KERN_ERR "%d", count);
 		pr_err("Invalid Count");
 		return -EINVAL;
@@ -220,6 +230,15 @@ static ssize_t dev_read(struct file *filep, char __user *mem,CFG_REG_SIZE
 		pr_err("Failed to copy all Bytes");
 		return bytes_not_copied;
 	}
+
+	//Toggle Read Bit as Required by Hardware
+	resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
+	resetvalue ^= TGL_BITMASK;
+	iowrite32(resetvalue, ds->addr+CFG_OFFSET_REGISTER);
+
+
+
+
 	*offp += (count-bytes_not_copied);
   return count;
 }
