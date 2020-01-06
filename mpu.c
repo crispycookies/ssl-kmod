@@ -43,7 +43,9 @@
 struct driver_struct{
 	void * addr;
 	void * addr_rbuffer;
-	u8 buffer[SIZE]
+	u8 buffer[SIZE];
+	int irq_num;
+	int pid;
 	struct miscdevice miscdev;
 };
 
@@ -100,6 +102,29 @@ static void dev_exit(struct platform_device *pdev){
 	platform_set_drvdata(pdev, NULL);
 }
 
+static irqreturn_t irq_handler(int irq, void *dev_id)
+{
+	//TODO
+	struct altera_mpu *mpu = dev_id;
+	struct siginfo info;
+   	struct task_struct *t;
+
+        t = pid_task(find_vpid(mpu->pid), PIDTYPE_PID);
+	if(t == NULL)
+		return IRQ_HANDLED;
+
+	memset(&info, 0, sizeof(struct siginfo));
+	info.si_signo = SIG_TEST;
+	info.si_code = SI_QUEUE;
+	info.si_int = 1234;
+
+	/* Tell userspace that IRQ occured */
+	send_sig_info(SIG_TEST, &info, t);
+
+	return IRQ_HANDLED;
+}
+
+
 
 //TODO KZALLOC
 static int dev_probe(struct platform_device *pdev){
@@ -107,6 +132,7 @@ static int dev_probe(struct platform_device *pdev){
 	void * addr_rbuffer;
 	struct resource *r;
 	struct driver_struct * ds;
+	int irq_num;
 
 	pr_info("Attempting to probe Driver");
 
@@ -147,6 +173,15 @@ static int dev_probe(struct platform_device *pdev){
 	}
 	pr_info("Succeeded to Register/Allocate/Map Resource 2");
 
+	//Get IRQ
+	irq_num = irq_of_parse_and_map(pdev->dev.of_node, 0);
+	if(devm_request_irq(&pdev->dev, irq_num, irq_handler,
+				  IRQF_SHARED,
+				  DRIVER_NAME, mpu)){
+						pr_err("Failed to register Interrupt");
+						return -EIO;
+	}
+
 	ds = devm_kzalloc(&pdev->dev, sizeof(struct driver_struct), GFP_KERNEL);
 	if(ds == NULL){
 		pr_err("Failed to Alloc Driver Data");
@@ -154,6 +189,7 @@ static int dev_probe(struct platform_device *pdev){
 	}
 	ds->addr = addr;
 	ds->addr_rbuffer = addr_rbuffer;
+	ds->irq_num = irq_num;
 	platform_set_drvdata(pdev, ds);
 	//TODO set data ? Maybe finished
 	//Request IRQ
