@@ -1,5 +1,5 @@
 /*MPU Device Kernel Module
- *for registering and storinggyro data
+ *for registering and storing gyro data
  *and making them available to user
  *Copyright (C) 2019  Tobias Egger <s1910567016@students.fh-hagenberg.at>
  *This program is free software; you can redistribute it and/or
@@ -24,9 +24,14 @@
 #include <linux/device.h>
 #include <linux/io.h>
 #include <linux/of.h>
+#include <linux/of_irq.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
+#include <linux/signal.h>
+#include <linux/sched.h>
+#include <asm/siginfo.h>
 
 #define DEVICE_NAME "mpu"
 #define DEVICE_COMP_STR "sch,mpu9250-1.0"
@@ -39,6 +44,7 @@
 #define TGL_BITMASK 0x2
 #define RES_2_LEN 3072
 #define TOTAL_RES_LEN R_LEN/2+RES_2_LEN/2
+#define IRQ_FLAG_APP 44
 
 struct driver_struct{
 	void * addr;
@@ -105,21 +111,21 @@ static void dev_exit(struct platform_device *pdev){
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
 	//TODO
-	struct altera_mpu *mpu = dev_id;
+	struct driver_struct *driver = dev_id;
 	struct siginfo info;
-   	struct task_struct *t;
+  struct task_struct *t_struct;
 
-        t = pid_task(find_vpid(mpu->pid), PIDTYPE_PID);
-	if(t == NULL)
+  t_struct = pid_task(find_vpid(driver->pid), PIDTYPE_PID);
+	if(t_struct == NULL)
 		return IRQ_HANDLED;
 
 	memset(&info, 0, sizeof(struct siginfo));
-	info.si_signo = SIG_TEST;
+	info.si_signo = IRQ_FLAG_APP;
 	info.si_code = SI_QUEUE;
 	info.si_int = 1234;
 
 	/* Tell userspace that IRQ occured */
-	send_sig_info(SIG_TEST, &info, t);
+	send_sig_info(SIG_TEST, &info, t_struct);
 
 	return IRQ_HANDLED;
 }
