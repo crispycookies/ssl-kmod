@@ -31,11 +31,16 @@
 #define DEVICE_NAME "mpu"
 #define DEVICE_COMP_STR "sch,mpu9250-1.0"
 #define R_LEN 0x24
-#define SIZE 2
-#define THRESHOLD_OFFSET 0x10
+#define SIZE 14
+#define THR_REG_SIZE 0x6
+#define THR_OFFSET_BUFFER 0x2
+#define THR_OFFSET_REGISTER 0x14
+#define CFG_OFFSET_REGISTER 0x10
+#define TGL_BITMASK 0x2
 
 struct driver_struct{
 	void * addr;
+	void * addr_rbuffer;
 	u8 buffer[SIZE]
 	struct miscdevice miscdev;
 };
@@ -97,6 +102,7 @@ static void dev_exit(struct platform_device *pdev){
 //TODO KZALLOC
 static int dev_probe(struct platform_device *pdev){
 	void * addr;
+	void * addr_rbuffer;
 	struct resource *r;
 	struct driver_struct * ds;
 
@@ -120,12 +126,32 @@ static int dev_probe(struct platform_device *pdev){
 	}
 	pr_info("Succeeded to Register/Allocate/Map Resource");
 
+
+	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if(r==0){
+		pr_err("Failed to fetch Resource 2");
+		return -EINVAL;
+	}
+
+	pr_info("Trying to Allocate Region 2: Start -> %08lx",
+		(long unsigned int)r->start);
+	pr_info("Trying to Allocate Region 2: End -> %08lx",
+		(long unsigned int)r->end);
+
+	addr_rbuffer = devm_ioremap_resource(&pdev->dev, r);
+	if (IS_ERR(addr_rbuffer)){
+		pr_err("Failed to Allocate Memory 2");
+		return -EIO;
+	}
+	pr_info("Succeeded to Register/Allocate/Map Resource 2");
+
 	ds = devm_kzalloc(&pdev->dev, sizeof(struct driver_struct), GFP_KERNEL);
 	if(ds == NULL){
 		pr_err("Failed to Alloc Driver Data");
 		return -ENOMEM;
 	}
 	ds->addr = addr;
+	ds->addr_rbuffer = addr_rbuffer;
 	platform_set_drvdata(pdev, ds);
 	//TODO set data ? Maybe finished
 	//Request IRQ
@@ -149,7 +175,7 @@ static struct platform_driver driver_platform_driver = {
 };
 module_platform_driver(driver_platform_driver);
 
-static ssize_t dev_read(struct file *filep, char __user *mem,
+static ssize_t dev_read(struct file *filep, char __user *mem,CFG_REG_SIZE
 					size_t count, loff_t *offp){
 	struct driver_struct * ds;
 	u16 data_to_be_copied[R_LEN/4];
@@ -200,7 +226,9 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 static ssize_t dev_write(struct file *filep, const char __user *mem,
 					size_t count, loff_t *offp){
 	struct driver_struct *ds;
-	u16 threshold = 0;
+	u32 threshold = 0;
+	u32 cfg_register = 0;
+	int i = 0;
 	ds = container_of(filep->private_data, struct driver_struct, miscdev);
 
 	if(ds == NULL){
@@ -231,13 +259,44 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 	}
 
 	count = count - copy_from_user(ds->buffer + (*offp), mem, count);
+	//Config Register
 	printk(KERN_INFO "Value Read : i -> 1: val - >  0x%02hhx", ds->buffer[0]);
 	printk(KERN_INFO "Value Read : i -> 2: val - >  0x%02hhx", ds->buffer[1]);
 
-	threshold = buffer[0] << 8;
-	threshold |= buffer[1];
+	//Threshold Registers
+	printk(KERN_INFO "Value Read : i -> 3: val - >  0x%02hhx", ds->buffer[2]);
+	printk(KERN_INFO "Value Read : i -> 4: val - >  0x%02hhx", ds->buffer[3]);
 
-	iowrite16(threshold, ds->addr+THRESHOLD_OFFSET);
+	printk(KERN_INFO "Value Read : i -> 5: val - >  0x%02hhx", ds->buffer[4]);
+	printk(KERN_INFO "Value Read : i -> 6: val - >  0x%02hhx", ds->buffer[5]);
+
+	printk(KERN_INFO "Value Read : i -> 7: val - >  0x%02hhx", ds->buffer[6]);
+	printk(KERN_INFO "Value Read : i -> 8: val - >  0x%02hhx", ds->buffer[7]);
+
+	printk(KERN_INFO "Value Read : i -> 9: val - >  0x%02hhx", ds->buffer[8]);
+	printk(KERN_INFO "Value Read : i -> 10: val - >  0x%02hhx", ds->buffer[9]);
+
+	printk(KERN_INFO "Value Read : i -> 11: val - >  0x%02hhx", ds->buffer[10]);
+	printk(KERN_INFO "Value Read : i -> 12: val - >  0x%02hhx", ds->buffer[11]);
+
+	printk(KERN_INFO "Value Read : i -> 13: val - >  0x%02hhx", ds->buffer[12]);
+	printk(KERN_INFO "Value Read : i -> 14: val - >  0x%02hhx", ds->buffer[13]);
+
+	cfg_register = ds_buffer[0] << 8;
+	cfg_register |= ds_buffer[1];
+	//Delete Bit
+	cfg_register &= ~(TGL_BITMASK);
+	iowrite32(cfg_register, ds->addr+CFG_OFFSET_REGISTER);
+
+	for(i = 0; i < (THR_REG_SIZE*2),i+=2){
+		threshold = buffer[THR_OFFSET_BUFFER+i] << 8;
+		threshold |= buffer[THR_OFFSET_BUFFER+i+1];
+
+		printk(KERN_INFO "Built Threshold at i -> %d equals %08x", i ,threshold);
+
+		iowrite32(threshold, ds->addr+THR_OFFSET_REGISTER+(i*2));
+	}
+	return count;
 }
 
 static int dev_open(struct inode *inode, struct file *filep){
