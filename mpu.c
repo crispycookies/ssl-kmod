@@ -40,13 +40,14 @@
 #define SIZE 18
 #define THR_REG_SIZE 0x6
 #define THR_OFFSET_BUFFER 0x2
-#define THR_OFFSET_REGISTER 0x14
-#define CFG_OFFSET_REGISTER 0x10
+#define THR_OFFSET_REGISTER 0x28
+#define CFG_OFFSET_REGISTER 0x24
 #define TGL_BITMASK 0x2
 #define RES_2_LEN 3072
 #define TOTAL_RES_LEN R_LEN/2+RES_2_LEN/2
 #define IRQ_FLAG_APP 44
 #define STREAM_SIZE R_LEN/4
+#define CFG_BITMASK_TO_DELETE 0xFFFFFFFE
 
 struct driver_struct{
 	void * addr;
@@ -260,25 +261,29 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 		return -ENOMEM;
 	}
 
+
 	for(i = 0; i < R_LEN/4; i++){
 		// Only Debug
 		buffer = ioread32(ds->addr+i*4);
 		ds->data_to_be_copied[i] = (u16)buffer;
 		printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", ds->data_to_be_copied[i], buffer);
 	}
-	//3072 Vlaues
-	for(i = 0; i < RES_2_LEN/4; i++){
-		// Only Debug
-		buffer = ioread32(ds->addr+i*4);
-		ds->data_to_be_copied[i+R_LEN/4] = (u16)buffer;
-		printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", ds->data_to_be_copied[i+R_LEN/4], buffer);
-	}
-
+	
 	//Check Mode
 	modecheck = ioread32(ds->addr+CFG_OFFSET_REGISTER);
 	if(!(modecheck & 1)){
 		size = STREAM_SIZE;
 	}
+	else{
+		//3072 Vlaues
+		for(i = 0; i < RES_2_LEN/4; i++){
+			// Only Debug
+			buffer = ioread32(ds->addr+i*4);
+			ds->data_to_be_copied[i+R_LEN/4] = (u16)buffer;
+			printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", ds->data_to_be_copied[i+R_LEN/4], buffer);
+		}
+	}
+
 
 	if((*offp+count)>size)
 		count = size-(*offp);
@@ -323,6 +328,7 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 	u32 cfg_register = 0;
 	int i = 0;
 	u32 pid = 0;
+	u32 cfg_register_old = 0;
 
 	ds = container_of(filep->private_data, struct driver_struct, miscdev);
 
@@ -386,10 +392,9 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 	printk(KERN_INFO "Value Read : i -> 13: val - >  0x%02hhx", ds->buffer[16]);
 	printk(KERN_INFO "Value Read : i -> 14: val - >  0x%02hhx", ds->buffer[17]);
 
-	cfg_register = ds->buffer[0] << 8;
-	cfg_register |= ds->buffer[1];
-	//Delete Bit
-	cfg_register &= ~(TGL_BITMASK);
+	cfg_register_old = ioread32(ds->addr+CFG_OFFSET_REGISTER);
+	cfg_register = (ds->buffer[1] & ~CFG_BITMASK_TO_DELETE)|cfg_register_old;
+	printk(KERN_INFO "CFG_REG no is set to be: %d", cfg_register);
 	iowrite32(cfg_register, ds->addr+CFG_OFFSET_REGISTER);
 
 	for(i = 0; i < (THR_REG_SIZE*2);i+=2){
