@@ -44,7 +44,7 @@
 #define CFG_OFFSET_REGISTER 0x24
 #define TGL_BITMASK 0x2
 #define RES_2_LEN 3072
-#define TOTAL_RES_LEN R_LEN/2+RES_2_LEN/2
+#define TOTAL_RES_LEN R_LEN/2+RES_2_LEN*2
 #define IRQ_FLAG_APP 44
 #define STREAM_SIZE R_LEN/4
 #define CFG_BITMASK_TO_DELETE 0xFFFFFFFE
@@ -103,7 +103,14 @@ static int dev_init(struct driver_struct * data){
 
 static void dev_exit(struct platform_device *pdev){
 	struct driver_struct * ds;
+	u32 resetvalue = 0;
 	ds = platform_get_drvdata(pdev);
+
+	//Toggle Read Bit as Required by Hardware(DEL IRQ) and disable
+	resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
+	resetvalue ^= TGL_BITMASK;
+	resetvalue &= ~0x0001;
+	iowrite32(resetvalue, ds->addr+CFG_OFFSET_REGISTER);
 
 	pr_info("Unloading Driver");
 	pr_info("Unregistering Misc-Device");
@@ -119,6 +126,7 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	struct siginfo info;
 	struct task_struct *t_struct;
 	u32 resetvalue = 0;
+
 
 	//Toggle Read Bit as Required by Hardware
 	resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
@@ -149,6 +157,7 @@ static int dev_probe(struct platform_device *pdev){
 	void * addr;
 	void * addr_rbuffer;
 	struct resource *r;
+	struct resource *r2;
 	struct driver_struct * ds;
 	int irq_num;
 
@@ -173,18 +182,18 @@ static int dev_probe(struct platform_device *pdev){
 	pr_info("Succeeded to Register/Allocate/Map Resource");
 
 
-	r = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	if(r==0){
+	r2 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	if(r2==0){
 		pr_err("Failed to fetch Resource 2");
 		return -EINVAL;
 	}
 
 	pr_info("Trying to Allocate Region 2: Start -> %08lx",
-		(long unsigned int)r->start);
+		(long unsigned int)r2->start);
 	pr_info("Trying to Allocate Region 2: End -> %08lx",
-		(long unsigned int)r->end);
+		(long unsigned int)r2->end);
 
-	addr_rbuffer = devm_ioremap_resource(&pdev->dev, r);
+	addr_rbuffer = devm_ioremap_resource(&pdev->dev, r2);
 	if (IS_ERR(addr_rbuffer)){
 		pr_err("Failed to Allocate Memory 2");
 		return -EIO;
@@ -261,12 +270,13 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 		return -ENOMEM;
 	}
 
+	printk(KERN_INFO "%08lx", (long unsigned int)ds->addr_rbuffer);
+	printk(KERN_INFO "%08lx", (long unsigned int)ds->addr);
 
 	for(i = 0; i < R_LEN/4; i++){
 		// Only Debug
 		buffer = ioread32(ds->addr+i*4);
 		ds->data_to_be_copied[i] = (u16)buffer;
-		printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", ds->data_to_be_copied[i], buffer);
 	}
 	
 	//Check Mode
@@ -276,11 +286,10 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 	}
 	else{
 		//3072 Vlaues
-		for(i = 0; i < RES_2_LEN/4; i++){
+		for(i = 0; i < RES_2_LEN; i++){
 			// Only Debug
-			buffer = ioread32(ds->addr+i*4);
+			buffer = ioread32(ds->addr_rbuffer+i*4);
 			ds->data_to_be_copied[i+R_LEN/4] = (u16)buffer;
-			printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", ds->data_to_be_copied[i+R_LEN/4], buffer);
 		}
 	}
 
