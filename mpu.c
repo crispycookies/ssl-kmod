@@ -53,6 +53,7 @@ struct driver_struct{
 	u8 buffer[SIZE];
 	int irq_num;
 	int pid;
+	u16  *data_to_be_copied;
 	struct miscdevice miscdev;
 };
 
@@ -187,6 +188,13 @@ static int dev_probe(struct platform_device *pdev){
 		return -ENOMEM;
 	}
 
+	ds->data_to_be_copied =
+		devm_kzalloc(&pdev->dev, TOTAL_RES_LEN, GFP_KERNEL);
+	if(ds->data_to_be_copied == NULL){
+		pr_err("Failed to Alloc Driver Buffer-Array");
+		return -ENOMEM;
+	}
+
 	//Get IRQ
 	irq_num = irq_of_parse_and_map(pdev->dev.of_node, 0);
 	if(devm_request_irq(&pdev->dev, irq_num, irq_handler,
@@ -225,32 +233,33 @@ module_platform_driver(driver_platform_driver);
 static ssize_t dev_read(struct file *filep, char __user *mem,
 					size_t count, loff_t *offp){
 	struct driver_struct * ds;
-	u16  *data_to_be_copied[TOTAL_RES_LEN];
 	unsigned long bytes_not_copied;
 	u32 i = 0;
 	u32 buffer = 0;
 	u32 resetvalue = 0;
-
-
 
 	ds = container_of(filep->private_data, struct driver_struct, miscdev);
 	if(ds == NULL){
 		pr_err("Failed to get Container Info");
 		return -EINVAL;
 	}
+	if(ds->data_to_be_copied == NULL){
+		pr_err("Failed to get Buffer Array");
+		return -ENOMEM;
+	}
 
 	for(i = 0; i < R_LEN/4; i++){
 		// Only Debug
 		buffer = ioread32(ds->addr+i*4);
-		data_to_be_copied[i] = (u16)buffer;
-		printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", data_to_be_copied[i], buffer);
+		ds->data_to_be_copied[i] = (u16)buffer;
+		printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", ds->data_to_be_copied[i], buffer);
 	}
 	//3072 Vlaues
 	for(i = 0; i < RES_2_LEN/4; i++){
 		// Only Debug
 		buffer = ioread32(ds->addr+i*4);
-		data_to_be_copied[i+R_LEN/4] = (u16)buffer;
-		printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", data_to_be_copied[i+R_LEN/4], buffer);
+		ds->data_to_be_copied[i+R_LEN/4] = (u16)buffer;
+		printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", ds->data_to_be_copied[i+R_LEN/4], buffer);
 	}
 
 	if((*offp+count)>TOTAL_RES_LEN)
@@ -272,7 +281,7 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 		pr_err("Invalid Count");
 		return -EINVAL;
 	}
-	bytes_not_copied = copy_to_user(mem, data_to_be_copied+(*offp), count);
+	bytes_not_copied = copy_to_user(mem, ds->data_to_be_copied+(*offp), count);
 	if(bytes_not_copied!=0){
 		pr_err("Failed to copy all Bytes");
 		return bytes_not_copied;
