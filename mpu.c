@@ -37,7 +37,7 @@
 #define DEVICE_NAME "mpu"
 #define DEVICE_COMP_STR "sch,mpu9250-1.0"
 #define R_LEN 0x24
-#define SIZE 14
+#define SIZE 18
 #define THR_REG_SIZE 0x6
 #define THR_OFFSET_BUFFER 0x2
 #define THR_OFFSET_REGISTER 0x14
@@ -46,13 +46,14 @@
 #define RES_2_LEN 3072
 #define TOTAL_RES_LEN R_LEN/2+RES_2_LEN/2
 #define IRQ_FLAG_APP 44
+#define STREAM_SIZE R_LEN/4
 
 struct driver_struct{
 	void * addr;
 	void * addr_rbuffer;
 	u8 buffer[SIZE];
 	int irq_num;
-	int pid;
+	u32 pid;
 	u16  *data_to_be_copied;
 	struct miscdevice miscdev;
 };
@@ -113,11 +114,19 @@ static void dev_exit(struct platform_device *pdev){
 static irqreturn_t irq_handler(int irq, void *dev_id)
 {
 	//TODO
-	struct driver_struct *driver = dev_id;
+	struct driver_struct *ds = dev_id;
 	struct siginfo info;
-  struct task_struct *t_struct;
+	struct task_struct *t_struct;
+	u32 resetvalue = 0;
 
-  t_struct = pid_task(find_vpid(driver->pid), PIDTYPE_PID);
+	//Toggle Read Bit as Required by Hardware
+	resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
+	resetvalue ^= TGL_BITMASK;
+	iowrite32(resetvalue, ds->addr+CFG_OFFSET_REGISTER);
+
+	printk(KERN_INFO "IRQ Called");
+
+	t_struct = pid_task(find_vpid(ds->pid), PIDTYPE_PID);
 	if(t_struct == NULL)
 		return IRQ_HANDLED;
 
@@ -196,7 +205,8 @@ static int dev_probe(struct platform_device *pdev){
 	}
 
 	//Get IRQ
-	irq_num = irq_of_parse_and_map(pdev->dev.of_node, 0);
+	irq_num = platform_get_irq(pdev, 0);
+
 	if(devm_request_irq(&pdev->dev, irq_num, irq_handler,
 				  IRQF_SHARED,
 				  DEVICE_NAME, ds)){
@@ -237,6 +247,8 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 	u32 i = 0;
 	u32 buffer = 0;
 	u32 resetvalue = 0;
+	u32 modecheck = 0;
+	u32 size = TOTAL_RES_LEN;
 
 	ds = container_of(filep->private_data, struct driver_struct, miscdev);
 	if(ds == NULL){
@@ -262,13 +274,19 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 		printk(KERN_ERR "Data Read is: %04x | Raw Data is %08x", ds->data_to_be_copied[i+R_LEN/4], buffer);
 	}
 
-	if((*offp+count)>TOTAL_RES_LEN)
-		count = TOTAL_RES_LEN-(*offp);
+	//Check Mode
+	modecheck = ioread32(ds->addr+CFG_OFFSET_REGISTER);
+	if(!(modecheck & 1)){
+		size = STREAM_SIZE;
+	}
+
+	if((*offp+count)>size)
+		count = size-(*offp);
 	if((*offp) < 0){
 		pr_err("Invalid Offest");
 		return -EINVAL;
 	}
-	if((*offp) > TOTAL_RES_LEN){
+	if((*offp) > size){
 		printk(KERN_ERR "%lld", *offp);
 		pr_err("Invalid Offest");
 		return -EINVAL;
@@ -276,7 +294,7 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 	if(count == 0){
 		return count;
 	}
-	if(count > TOTAL_RES_LEN){
+	if(count > size){
 		printk(KERN_ERR "%d", count);
 		pr_err("Invalid Count");
 		return -EINVAL;
@@ -304,6 +322,8 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 	u32 threshold = 0;
 	u32 cfg_register = 0;
 	int i = 0;
+	u32 pid = 0;
+
 	ds = container_of(filep->private_data, struct driver_struct, miscdev);
 
 	if(ds == NULL){
@@ -312,6 +332,9 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 	}
 
 	pr_info("Addr: Start -> %08lx", (long unsigned int)ds->addr);
+
+
+
 
 	if((*offp+count)>SIZE)
 		count = SIZE-(*offp);
@@ -356,6 +379,12 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 
 	printk(KERN_INFO "Value Read : i -> 13: val - >  0x%02hhx", ds->buffer[12]);
 	printk(KERN_INFO "Value Read : i -> 14: val - >  0x%02hhx", ds->buffer[13]);
+	
+	printk(KERN_INFO "Value Read : i -> 11: val - >  0x%02hhx", ds->buffer[14]);
+	printk(KERN_INFO "Value Read : i -> 12: val - >  0x%02hhx", ds->buffer[15]);
+
+	printk(KERN_INFO "Value Read : i -> 13: val - >  0x%02hhx", ds->buffer[16]);
+	printk(KERN_INFO "Value Read : i -> 14: val - >  0x%02hhx", ds->buffer[17]);
 
 	cfg_register = ds->buffer[0] << 8;
 	cfg_register |= ds->buffer[1];
@@ -371,6 +400,17 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 
 		iowrite32(threshold, ds->addr+THR_OFFSET_REGISTER+(i*2));
 	}
+	
+	pid = ds->buffer[14] << 24;
+	pid |= ds->buffer[15] << 16;
+	pid |= ds->buffer[16] << 8;
+	pid |= ds->buffer[17];
+	
+	printk(KERN_INFO "PID: %d", pid);
+	printk(KERN_INFO "PIDS: %d", pid);
+	
+	ds->pid = pid;
+	
 	return count;
 }
 
