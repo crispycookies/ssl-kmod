@@ -31,6 +31,7 @@
 #include <linux/platform_device.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
+#include <linux/sched/signal.h>
 #include <asm/siginfo.h>
 
 #define DEVICE_NAME "mpu"
@@ -125,7 +126,7 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 	info.si_int = 1234;
 
 	/* Tell userspace that IRQ occured */
-	send_sig_info(SIG_TEST, &info, t_struct);
+	send_sig_info(IRQ_FLAG_APP, &info, t_struct);
 
 	return IRQ_HANDLED;
 }
@@ -179,20 +180,22 @@ static int dev_probe(struct platform_device *pdev){
 	}
 	pr_info("Succeeded to Register/Allocate/Map Resource 2");
 
-	//Get IRQ
-	irq_num = irq_of_parse_and_map(pdev->dev.of_node, 0);
-	if(devm_request_irq(&pdev->dev, irq_num, irq_handler,
-				  IRQF_SHARED,
-				  DRIVER_NAME, mpu)){
-						pr_err("Failed to register Interrupt");
-						return -EIO;
-	}
 
 	ds = devm_kzalloc(&pdev->dev, sizeof(struct driver_struct), GFP_KERNEL);
 	if(ds == NULL){
 		pr_err("Failed to Alloc Driver Data");
 		return -ENOMEM;
 	}
+
+	//Get IRQ
+	irq_num = irq_of_parse_and_map(pdev->dev.of_node, 0);
+	if(devm_request_irq(&pdev->dev, irq_num, irq_handler,
+				  IRQF_SHARED,
+				  DEVICE_NAME, ds)){
+						pr_err("Failed to register Interrupt");
+						return -EIO;
+	}
+
 	ds->addr = addr;
 	ds->addr_rbuffer = addr_rbuffer;
 	ds->irq_num = irq_num;
@@ -219,14 +222,16 @@ static struct platform_driver driver_platform_driver = {
 };
 module_platform_driver(driver_platform_driver);
 
-static ssize_t dev_read(struct file *filep, char __user *mem,CFG_REG_SIZE
+static ssize_t dev_read(struct file *filep, char __user *mem,
 					size_t count, loff_t *offp){
 	struct driver_struct * ds;
-	u16 data_to_be_copied[R_LEN/4];
+	u16  *data_to_be_copied[TOTAL_RES_LEN];
 	unsigned long bytes_not_copied;
 	u32 i = 0;
 	u32 buffer = 0;
 	u32 resetvalue = 0;
+
+
 
 	ds = container_of(filep->private_data, struct driver_struct, miscdev);
 	if(ds == NULL){
@@ -343,15 +348,15 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 	printk(KERN_INFO "Value Read : i -> 13: val - >  0x%02hhx", ds->buffer[12]);
 	printk(KERN_INFO "Value Read : i -> 14: val - >  0x%02hhx", ds->buffer[13]);
 
-	cfg_register = ds_buffer[0] << 8;
-	cfg_register |= ds_buffer[1];
+	cfg_register = ds->buffer[0] << 8;
+	cfg_register |= ds->buffer[1];
 	//Delete Bit
 	cfg_register &= ~(TGL_BITMASK);
 	iowrite32(cfg_register, ds->addr+CFG_OFFSET_REGISTER);
 
-	for(i = 0; i < (THR_REG_SIZE*2),i+=2){
-		threshold = buffer[THR_OFFSET_BUFFER+i] << 8;
-		threshold |= buffer[THR_OFFSET_BUFFER+i+1];
+	for(i = 0; i < (THR_REG_SIZE*2);i+=2){
+		threshold = ds->buffer[THR_OFFSET_BUFFER+i] << 8;
+		threshold |= ds->buffer[THR_OFFSET_BUFFER+i+1];
 
 		printk(KERN_INFO "Built Threshold at i -> %d equals %08x", i ,threshold);
 
