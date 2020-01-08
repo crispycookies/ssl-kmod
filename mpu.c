@@ -278,7 +278,7 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 		buffer = ioread32(ds->addr+i*4);
 		ds->data_to_be_copied[i] = (u16)buffer;
 	}
-	
+
 	//Check Mode
 	modecheck = ioread32(ds->addr+CFG_OFFSET_REGISTER);
 	if(!(modecheck & 1)){
@@ -286,11 +286,12 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 	}
 	else{
 		//3072 Vlaues
-		for(i = 0; i < RES_2_LEN; i++){
+		for(i = 0; i < (RES_2_LEN/2); i++){
 			// Only Debug
-			buffer = ioread32(ds->addr_rbuffer+i*4);
+			buffer =ioread32(ds->addr_rbuffer+i*4);
 			ds->data_to_be_copied[i+R_LEN/4] = (u16)buffer;
 		}
+		printk(KERN_INFO "Iteration: %d", i*4);
 	}
 
 
@@ -394,7 +395,7 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 
 	printk(KERN_INFO "Value Read : i -> 13: val - >  0x%02hhx", ds->buffer[12]);
 	printk(KERN_INFO "Value Read : i -> 14: val - >  0x%02hhx", ds->buffer[13]);
-	
+
 	printk(KERN_INFO "Value Read : i -> 11: val - >  0x%02hhx", ds->buffer[14]);
 	printk(KERN_INFO "Value Read : i -> 12: val - >  0x%02hhx", ds->buffer[15]);
 
@@ -414,17 +415,17 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 
 		iowrite32(threshold, ds->addr+THR_OFFSET_REGISTER+(i*2));
 	}
-	
+
 	pid = ds->buffer[14] << 24;
 	pid |= ds->buffer[15] << 16;
 	pid |= ds->buffer[16] << 8;
 	pid |= ds->buffer[17];
-	
+
 	printk(KERN_INFO "PID: %d", pid);
 	printk(KERN_INFO "PIDS: %d", pid);
-	
+
 	ds->pid = pid;
-	
+
 	return count;
 }
 
