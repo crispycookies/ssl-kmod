@@ -286,7 +286,7 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 	}
 	else{
 		//3072 Vlaues
-		for(i = 0; i < (RES_2_LEN/2); i++){
+		for(i = 0; i < (RES_2_LEN); i++){
 			// Only Debug
 			buffer =ioread32(ds->addr_rbuffer+i*4);
 			ds->data_to_be_copied[i+R_LEN/4] = (u16)buffer;
