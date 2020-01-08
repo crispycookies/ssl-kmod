@@ -47,7 +47,7 @@
 #define TOTAL_RES_LEN R_LEN/2+RES_2_LEN*2
 #define IRQ_FLAG_APP 44
 #define STREAM_SIZE R_LEN/4
-#define CFG_BITMASK_TO_DELETE 0xFFFFFFFE
+#define CFG_BITMASK_TO_DELETE 0xFFFFFFFD
 
 struct driver_struct{
 	void * addr;
@@ -422,7 +422,6 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 	pid |= ds->buffer[17];
 
 	printk(KERN_INFO "PID: %d", pid);
-	printk(KERN_INFO "PIDS: %d", pid);
 
 	ds->pid = pid;
 
