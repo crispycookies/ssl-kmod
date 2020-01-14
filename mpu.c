@@ -34,6 +34,8 @@
 #include <linux/sched/signal.h>
 #include <asm/siginfo.h>
 
+#include <linux/delay.h>
+
 #define DEVICE_NAME "mpu"
 #define DEVICE_COMP_STR "sch,mpu9250-1.0"
 #define R_LEN 0x24
@@ -47,7 +49,8 @@
 #define TOTAL_RES_LEN R_LEN/2+RES_2_LEN*2
 #define IRQ_FLAG_APP 44
 #define STREAM_SIZE R_LEN/4
-#define CFG_BITMASK_TO_DELETE 0xFFFFFFFD
+#define CFG_BITMASK_TO_DELETE 0xFFFFFFFE
+
 
 struct driver_struct{
 	void * addr;
@@ -109,7 +112,8 @@ static void dev_exit(struct platform_device *pdev){
 	//Toggle Read Bit as Required by Hardware(DEL IRQ) and disable
 	resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
 	resetvalue ^= TGL_BITMASK;
-	resetvalue &= ~0x0001;
+	resetvalue &= ~0x00000001;
+
 	iowrite32(resetvalue, ds->addr+CFG_OFFSET_REGISTER);
 
 	pr_info("Unloading Driver");
@@ -288,10 +292,9 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 		//3072 Vlaues
 		for(i = 0; i < (RES_2_LEN); i++){
 			// Only Debug
-			buffer =ioread32(ds->addr_rbuffer+i*4);
+			buffer = ioread32(ds->addr_rbuffer+i*4);
 			ds->data_to_be_copied[i+R_LEN/4] = (u16)buffer;
 		}
-		printk(KERN_INFO "Iteration: %d", i*4);
 	}
 
 
