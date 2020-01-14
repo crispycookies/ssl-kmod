@@ -49,7 +49,7 @@
 #define TOTAL_RES_LEN R_LEN/2+RES_2_LEN*2
 #define IRQ_FLAG_APP 44
 #define STREAM_SIZE R_LEN/4
-#define CFG_BITMASK_TO_DELETE 0xFFFFFFFE
+#define CFG_BITMASK_TO_DELETE 0x2
 
 
 struct driver_struct{
@@ -111,10 +111,14 @@ static void dev_exit(struct platform_device *pdev){
 
 	//Toggle Read Bit as Required by Hardware(DEL IRQ) and disable
 	resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
-	resetvalue ^= TGL_BITMASK;
 	resetvalue &= ~0x00000001;
-
 	iowrite32(resetvalue, ds->addr+CFG_OFFSET_REGISTER);
+
+	//Toggle Read Bit as Required by Hardware(DEL IRQ) and disable
+	resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
+	resetvalue ^= TGL_BITMASK;
+	iowrite32(resetvalue, ds->addr+CFG_OFFSET_REGISTER);
+
 
 	pr_info("Unloading Driver");
 	pr_info("Unregistering Misc-Device");
@@ -406,7 +410,11 @@ static ssize_t dev_write(struct file *filep, const char __user *mem,
 	printk(KERN_INFO "Value Read : i -> 14: val - >  0x%02hhx", ds->buffer[17]);
 
 	cfg_register_old = ioread32(ds->addr+CFG_OFFSET_REGISTER);
-	cfg_register = (ds->buffer[1] & ~CFG_BITMASK_TO_DELETE)|cfg_register_old;
+	if(cfg_register & CFG_BITMASK_TO_DELETE){
+		cfg_register = ds->buffer[1] | CFG_BITMASK_TO_DELETE;
+	}else{
+		cfg_register = ds->buffer[1];
+	}
 	printk(KERN_INFO "CFG_REG no is set to be: %d", cfg_register);
 	iowrite32(cfg_register, ds->addr+CFG_OFFSET_REGISTER);
 
