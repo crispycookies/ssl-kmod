@@ -137,9 +137,9 @@ static irqreturn_t irq_handler(int irq, void *dev_id)
 
 
 	//Toggle Read Bit as Required by Hardware
-	//resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
-	//resetvalue ^= TGL_BITMASK;
-	//iowrite32(resetvalue, ds->addr+CFG_OFFSET_REGISTER);
+	resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
+	resetvalue ^= TGL_BITMASK;
+	iowrite32(resetvalue, ds->addr+CFG_OFFSET_REGISTER);
 
 	printk(KERN_INFO "IRQ Called");
 
@@ -328,9 +328,9 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 	}
 
 	//Toggle Read Bit as Required by Hardware
-	//resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
-	//resetvalue ^= TGL_BITMASK;
-	//iowrite32(resetvalue, ds->addr+CFG_OFFSET_REGISTER);
+	resetvalue = ioread32(ds->addr+CFG_OFFSET_REGISTER);
+	resetvalue ^= TGL_BITMASK;
+	iowrite32(resetvalue, ds->addr+CFG_OFFSET_REGISTER);
 
 
 
