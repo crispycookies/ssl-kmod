@@ -48,7 +48,7 @@
 #define RES_2_LEN 3072
 #define TOTAL_RES_LEN R_LEN/2+RES_2_LEN*2
 #define IRQ_FLAG_APP 44
-#define STREAM_SIZE R_LEN/4
+#define STREAM_SIZE R_LEN/2
 #define CFG_BITMASK_TO_DELETE 0x2
 
 
@@ -297,7 +297,7 @@ static ssize_t dev_read(struct file *filep, char __user *mem,
 		for(i = 0; i < (RES_2_LEN); i++){
 			// Only Debug
 			buffer = ioread32(ds->addr_rbuffer+i*4);
-			ds->data_to_be_copied[i+R_LEN/4] = (u16)buffer;
+			ds->data_to_be_copied[i+STREAM_SIZE] = (u16)buffer;
 		}
 	}
 
